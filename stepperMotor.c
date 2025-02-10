@@ -1,0 +1,130 @@
+/*! \file */
+/*!
+ * stepperMotor.c
+ *
+ * Description: Stepper motor ULN2003 driver for MSP432P4111 Launchpad.
+ *              Assumes SMCLK configured with 48MHz HFXT as source.
+ *              Uses Timer_A3 and P2.7, P2.6, P2.5, P2.4
+ *
+ *  Created on:
+ *      Author:
+ */
+
+#include "StepperMotor.h"
+#include "msp.h"
+
+/* Global Variables  */
+// DONE fill in array with 4-bit binary sequence for wave drive (1-phase full step)
+const uint8_t stepperSequence[STEP_SEQ_CNT] = { 0b1000, 0b0100, 0b0010, 0b0001 };
+uint16_t stepPeriod = INIT_PERIOD;
+uint8_t currentStep = 0;
+
+void ConfigureStepper(void)
+{
+    // set stepper port pins as GPIO outputs
+    STEPPER_PORT->SEL0 = (STEPPER_PORT->SEL0) & ~STEPPER_MASK;
+    STEPPER_PORT->SEL1 = (STEPPER_PORT->SEL1) & ~STEPPER_MASK;
+    STEPPER_PORT->DIR = (STEPPER_PORT->DIR) | STEPPER_MASK;
+
+    // initialize stepper outputs to LOW
+    STEPPER_PORT->OUT = (STEPPER_PORT->OUT) & ~STEPPER_MASK;
+
+    /* Configure Timer_A3 and CCR0 */
+    // Set period of Timer_A3 in CCR0 register for Up Mode
+    TIMER_A3->CCR[0] = stepPeriod;
+    // DONE configure CCR0 for Compare mode with interrupt enabled (no output mode - 0)
+    TIMER_A3->CCTL[0] = TIMER_A_CCTLN_CCIE;
+    // Configure Timer_A3 in Up Mode, with source SMCLK, prescale 12:1, and
+    //  interrupt disabled  -  tick rate will be 4MHz (for SMCLK = 48MHz)
+    // DONE configure Timer_A3 (requires setting control AND expansion register)
+
+    TIMER_A3->CTL = 0x2C0;
+    //0x2C0 0x02D4 0x280
+    TIMER_A3->EX0 = 0b101;
+
+    //TIMER_A3->CTL = TIMER_A_CTL_SSEL__SMCLK | TIMER_A_CTL_MC__STOP | TIMER_A_CTL_ID__4;
+    //TIMER_A3->EX0 = TIMER_A_EX0_TAIDEX_2;  // Divider of 3
+    /* Configure global interrupts and NVIC */
+    // Enable TA3CCR0 compare interrupt by setting IRQ bit in NVIC ISER0 register
+    // DONE enable interrupt by setting IRQ bit in NVIC ISER0 register
+    NVIC->ISER[0] = 1 << (TA3_0_IRQn);  // Enable Timer_A3 CCR0 interrupt
+
+    __enable_irq();                             // Enable global interrupt
+}
+
+void enableStepperMotor(void)
+{
+    // DONE configure Timer_A3 in Up Mode (leaving remaining configuration unchanged)
+   // TIMER_A3->CTL &= ~0x30;
+    TIMER_A3->CTL |= TIMER_A_CTL_MC__UP;  // Set Timer_A3 to Up Mode
+}
+
+void disableStepperMotor(void)
+{
+    // DONE for future driver use (NOT NEEDED FOR EXERCISE)
+    //  Configure Timer_A3 in Stop Mode (leaving remaining configuration unchanged)
+    TIMER_A3->CTL = (TIMER_A3->CTL & ~TIMER_A_CTL_MC_MASK) | TIMER_A_CTL_MC__STOP;
+
+}
+
+void stepClockwise(void)
+{
+    currentStep = (currentStep + 1) % STEP_SEQ_CNT; // increment to next step position
+    // DONE update output port for current step pattern
+    //  do this as a single assignment to avoid transient changes on driver signals
+    STEPPER_PORT->OUT = (STEPPER_PORT->OUT & 0x0F) + (stepperSequence[currentStep] << 4);
+}
+
+void stepCounterClockwise(void)
+{
+    currentStep = ((uint8_t) (currentStep - 1)) % STEP_SEQ_CNT; // decrement to previous step position (counter-clockwise)
+    // DONE for future driver use (NOT NEEDED FOR EXERCISE)
+    //  update output port for current step pattern
+    //  do this as a single assignment to avoid transient changes on driver signals
+    STEPPER_PORT->OUT = (STEPPER_PORT->OUT & 0x0F) + (stepperSequence[currentStep] << 4);
+}
+
+#define FULL_STEPS 32
+#define HALF_STEPS 64
+void ResetStepperSpeed(float rpm, unsigned int StepperTimerClock)
+{
+   float stepper_value;
+//for full steps
+//DONE calculate step value. Cast integers to float to calculate float values correclty.
+   //stepper_value = 60.0 * (float) StepperTimerClock / (float)(rpm * 32 * 64);
+   stepper_value = (float) StepperTimerClock / (float)((rpm/60) * 32 * 64);
+//DONE set step value
+   // stepPeriod = (uint16_t) (stepper_value + 0.5f); // Round to nearest whole number
+    TIMER_A3->CCR[0] = stepper_value;
+
+   // printf(rpm);
+}
+
+// Timer A3 CCR0 interrupt service routine
+void TA3_0_IRQHandler(void)
+{
+    /* Not necessary to check which flag is set because only one IRQ
+     *  mapped to this interrupt vector     */
+    if (StepperStatus == CLOCKWISE)
+    {
+        stepClockwise();
+    }
+    else
+    {
+        stepCounterClockwise();
+    }
+    // DONE clear timer compare flag in TA3CCTL0
+    TIMER_A3->CCTL[0] &= ~TIMER_A_CCTLN_CCIFG;      // Clear CCR0 interrupt flag
+
+}
+
+void setStepperSpeed(float rpm)
+{
+    if (rpm < 1.0)
+        rpm = 1.0;
+    if (rpm > 10.0)
+        rpm = 10.0;
+
+    ResetStepperSpeed(rpm, TimerA3Clock);
+}
+
