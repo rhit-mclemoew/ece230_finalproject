@@ -1,6 +1,7 @@
 /*! \file */
 /*!
- * stepperMotor.h
+ * stepperMotorTemplate.h
+ * ECE230 Winter 2024-2025
  *
  * Description: Stepper motor ULN2003 driver for MSP432P4111 Launchpad.
  *              Assumes SMCLK configured with 48MHz HFXT as source.
@@ -24,30 +25,18 @@ extern "C"
 {
 #endif
 
-#include <msp.h>
-
-#define SMCLK 48000000 //Hz
-//Stepper definition
-//stepper_period_count =60xFtimer/(RPM*32*64)
-#define TimerA3Prescaler 48 //Timer A prescaler
-#define TimerA3Clock  SMCLK/TimerA3Prescaler
-#define RPM13 13
-#define STEPPER_13RPM 60*TimerA3Clock/(32*64*RPM13)  //Timer count value
+#include "msp.h"
 
 #define STEPPER_PORT                    P2
 #define STEPPER_MASK                    (0x00F0)
-#define STEPPER_IN1                     BIT7
-#define STEPPER_IN2                     BIT6
-#define STEPPER_IN3                     BIT5
-#define STEPPER_IN4                     BIT4
+#define STEPPER_IN1                     (0x0080)
+#define STEPPER_IN2                     (0x0040)
+#define STEPPER_IN3                     (0x0020)
+#define STEPPER_IN4                     (0x0010)
 
-// DONE set initial step timer period for 1 RPM (based on 1MHz clock rate)
-#define INIT_PERIOD               29296
-#define STEP_SEQ_CNT              4
-//stepper status to be changed by S2 in advanced implementation
-enum {CLOCKWISE, COUNTER_CLOCKWISE} StepperStatus;
-
-
+// TODO set initial step timer period for 10 RPM (based on 4MHz clock rate)
+#define INIT_PERIOD                     11719
+#define STEP_SEQ_CNT                    4
 
 /*!
  * \brief This function configures pins and timer for stepper motor driver
@@ -61,7 +50,7 @@ enum {CLOCKWISE, COUNTER_CLOCKWISE} StepperStatus;
  *
  * \return None
  */
-extern void ConfigureStepper(void);
+extern void initStepperMotor(void);
 
 
 /*!
@@ -89,6 +78,7 @@ void enableStepperMotor(void);
  */
 void disableStepperMotor(void);
 
+
 /*!
  * \brief This increments step clockwise
  *
@@ -99,6 +89,7 @@ void disableStepperMotor(void);
  * \return None
  */
 extern void stepClockwise(void);
+
 
 /*!
  * \brief This increments step counter-clockwise
@@ -111,33 +102,6 @@ extern void stepClockwise(void);
  */
 extern void stepCounterClockwise(void);
 
-
-/*!
- * \brief This increments servo angle 10 degrees, with wrap-around
- *
- * This function increments servo angle by 10 degrees. If new angle exceeds max
- *  angle (+90), it wraps around to min angle (-90)
- *
- * Modified \b TA2CCR1 register.
- *
- * \return None
- */
-extern void incrementTenDegree(void);
-
-
-/*!
- * \brief This function sets angle of servo
- *
- * This function sets angle of servo to \a angle (between -90 to 90)
- *
- *  \param angle Angle in degrees to set servo (between -90 to 90)
- *
- * Modified \b TA2CCR1 register.
- *
- * \return None
- */
-
-void ResetStepperSpeed(float rpm, unsigned int StepperTimerClock);
 
 //*****************************************************************************
 //

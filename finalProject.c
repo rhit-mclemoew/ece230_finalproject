@@ -1,5 +1,10 @@
 #include "msp.h"
-#include <stdio.h>
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "csHFXT.h"
+#include "csLFXT.h"
+#include "stepperMotor.h"
 
 // RGB port and bit masks
 #define RGB_PORT        P2              // Port 2
@@ -48,8 +53,11 @@ int main(void)
 {
     WDT_A->CTL = WDT_A_CTL_PW | WDT_A_CTL_HOLD;  // Stop watchdog timer
 
+    configHFXT();
     InitializeRGBLEDs();
     InitializeSwitches();
+    initStepperMotor();
+    enableStepperMotor();
 
     while (1) {
         // Check switches and control LEDs accordingly
