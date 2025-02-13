@@ -5,6 +5,7 @@
 #include "csHFXT.h"
 #include "csLFXT.h"
 #include "stepperMotor.h"
+#include "lcd.h"
 
 // RGB port and bit masks
 #define RGB_PORT        P2              // Port 2
@@ -23,6 +24,7 @@
 #define LED_FLASHING_PERIOD 200         // milliseconds
 #define SYSTEM_CLOCK_FREQUENCY 3000     // kHz
 #define SINGLE_LOOP_CYCLES  88
+#define CLK_FREQUENCY       48000000    // MCLK using 48MHz HFXT
 
 // Delay for debouncing
 #define DEBOUNCE_DELAY_CYCLES 5000
@@ -58,10 +60,35 @@ int main(void)
     InitializeSwitches();
     initStepperMotor();
     enableStepperMotor();
+    configLCD(CLK_FREQUENCY);
+        // sends initialization sequence and configuration to LCD
+    initLCD();
+
+//    printChar('Y');
+//    printChar('A');
+//    printChar('Y');
+//    printChar(' ');
+//    printChar('E');
+//    printChar('C');
+//    printChar('E');
+//    printChar('2');
+//    printChar('3');
+//    printChar('0');
+//    printChar('!');
+
+      printString(" Karoke Machine");
+      setCursor(1, 0); // Move to row 2, column 0
+      printString("  Press 'Next'");
+
 
     while (1) {
         // Check switches and control LEDs accordingly
         if (CheckSwitch1() == Pressed) {
+
+                clearDisplay();
+                setCursor(0, 0);
+                printString("1.    Happy");
+
             CurrentLED = RED;
         } else if (CheckSwitch2() == Pressed) {
             CurrentLED = GREEN;
