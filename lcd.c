@@ -22,7 +22,9 @@
 #include "lcd.h"
 #include "sysTickDelays.h"
 
-#define NONHOME_MASK        0xFC
+#define NONHOME_MASK        0xF
+
+#define LCD_WIDTH 16
 
 #define LONG_INSTR_DELAY    2000
 #define SHORT_INSTR_DELAY   50
@@ -148,27 +150,38 @@ void printChar(char character) {
     dataInstruction(character);
 }
 
-void printString(char *string) {
-    while (*string) {  // Loop until null terminator
-        dataInstruction(*string);  // Print one character at a time
-        string++;  // Move to the next character
+void lcdPrintString(const char *string) {
+    int pos = 0;  // Track cursor position
+
+    while (*string) {
+        if (pos == LCD_WIDTH) {  // If we've reached the end of line 1
+            lcdSetCursor(1, 0);   // Move to second line
+        }
+
+        dataInstruction(*string);  // Print the character
+        string++;
+        pos++;
+
+        if (pos == LCD_WIDTH * 2) {  // Stop after both lines are full
+            break;
+        }
     }
 }
 
-void setCursor(uint8_t row, uint8_t col) {
+
+void lcdSetCursor(int row, int col) {
     uint8_t address;
-
     if (row == 0) {
-        address = LINE1_OFFSET + col;  // First row address
+        address = 0x80 + col;  // Line 1 starts at 0x80
     } else {
-        address = LINE2_OFFSET + col;  // Second row address
+        address = 0xC0 + col;  // Line 2 starts at 0xC0
     }
-
-    commandInstruction(SET_CURSOR_MASK | address);  // Send command to move cursor
+    commandInstruction(address);
 }
 
 
-void clearDisplay() {
+void lcdClearDisplay() {
     // clear the LCD display and return cursor to home position
     commandInstruction(CLEAR_DISPLAY_MASK);
+    delayMicroSec(LONG_INSTR_DELAY);
 }
