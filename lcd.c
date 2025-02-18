@@ -154,8 +154,9 @@ void lcdPrintString(const char *string) {
     int pos = 0;  // Track cursor position
 
     while (*string) {
-        if (pos == LCD_WIDTH) {  // If we've reached the end of line 1
+        if (pos == LCD_WIDTH) {  // If we reach the end of the first line
             lcdSetCursor(1, 0);   // Move to second line
+            pos = 0;  // Reset position for second line
         }
 
         dataInstruction(*string);  // Print the character
@@ -169,7 +170,8 @@ void lcdPrintString(const char *string) {
 }
 
 
-void lcdSetCursor(int row, int col) {
+
+void lcdSetCursor(uint8_t row, uint8_t col) {
     uint8_t address;
     if (row == 0) {
         address = 0x80 + col;  // Line 1 starts at 0x80

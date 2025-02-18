@@ -122,11 +122,11 @@ extern void initLCD(void);
  */
 extern void printChar(char character);
 
-extern void printString(char *string);
+extern void lcdPrintString(const char *string);
 
-extern void setCursor(uint8_t row, uint8_t col);
+extern void lcdSetCursor(uint8_t row, uint8_t col);
 
-extern void clearDisplay(void);
+extern void lcdClearDisplay(void);
 
 
 //*****************************************************************************

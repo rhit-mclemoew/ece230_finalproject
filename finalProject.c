@@ -2,10 +2,12 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include "csHFXT.h"
 #include "csLFXT.h"
 #include "stepperMotor.h"
 #include "lcd.h"
+#include "uart.h"
 
 // RGB port and bit masks
 #define RGB_PORT        P2              // Port 2
@@ -58,9 +60,14 @@ SwitchState CheckSwitchToggle(void);
 SwitchState CheckSwitchReset(void);
 void debounce(void);
 void SetLED(LEDcolors color);
+void handleButtonPress(void);
+extern void play_serial_audio_stereo(void);
 
 // Global variables
 LEDcolors CurrentLED = NONE;
+
+volatile uint8_t receivedByte = 0;
+volatile bool dataReady = false;  // Flag to indicate data reception
 
 int main(void)
 {
@@ -73,12 +80,14 @@ int main(void)
     enableStepperMotor();
     configLCD(CLK_FREQUENCY);
     initLCD();
+    initUART();
+
 
     while (1) {
         handleButtonPress();
+
     }
 
-    return 0;
 }
 
 void handleButtonPress() {
@@ -114,7 +123,7 @@ void handleButtonPress() {
             char buffer[20];
             lcdClearDisplay();
             lcdSetCursor(0, 0);
-            snprintf(buffer, sizeof(buffer), "%s %s", isPlaying ? "> " : "||", songList[currentSong]);
+            snprintf(buffer, sizeof(buffer), "%s %s", isPlaying ? " >" : "||", songList[currentSong]);
             lcdPrintString(buffer);
             break;
         }
