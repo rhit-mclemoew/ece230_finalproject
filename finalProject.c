@@ -9,12 +9,6 @@
 #include "uart.h"
 #include "timer32.h"
 
-// RGB port and bit masks
-#define RGB_PORT        P2              // Port 2
-#define RGB_RED_PIN     0b00000001      // P2.0
-#define RGB_GREEN_PIN   0b00000010      // P2.1
-#define RGB_BLUE_PIN    0b00000100      // P2.2
-#define RGB_ALL_PINS    (RGB_RED_PIN | RGB_GREEN_PIN | RGB_BLUE_PIN)
 #define PLAYBACK_LED_PORT    P2    // Using Port 2
 #define PLAYBACK_LED_PIN     BIT3  // LED connected to P2.3
 
@@ -75,19 +69,18 @@ const char *songList[] = {
     "Runaway-Kanye West",
     "Ghost Riders in the Sky-Johnny Cash",
     "My Way-Frank Sinatra",
+    "We Are The Champions-Queen"
 };
 
 #define SONG_COUNT (sizeof(songList) / sizeof(songList[0]))
 
 // Function prototypes
-void InitializeRGBLEDs(void);
 void InitializeSwitches(void);
 SwitchState CheckSwitchNext(void);
 SwitchState CheckSwitchSelect(void);
 SwitchState CheckSwitchToggle(void);
 SwitchState CheckSwitchReset(void);
 void debounce(void);
-void SetLED(LEDcolors color);
 void handleButtonPress(void);
 extern void play_serial_audio_stereo(void);
 void InitializePlaybackLED(void);
@@ -103,7 +96,6 @@ int main(void)
 
     configHFXT();
     Timer32_Init();
-    InitializeRGBLEDs();
     InitializePlaybackLED();
     InitializeSwitches();
     initStepperMotor();
@@ -202,35 +194,6 @@ void handleButtonPress() {
     }
 }
 
-
-
-// Set the LED color
-void SetLED(LEDcolors color)
-{
-    // Turn off all LEDs first
-    RGB_PORT->OUT &= ~RGB_ALL_PINS;
-
-    // Turn on the selected color
-    switch (color) {
-        case RED:
-            RGB_PORT->OUT |= RGB_RED_PIN;
-            break;
-        case GREEN:
-            RGB_PORT->OUT |= RGB_GREEN_PIN;
-            break;
-        case BLUE:
-            RGB_PORT->OUT |= RGB_BLUE_PIN;
-            break;
-        case PURPLE:
-            RGB_PORT->OUT |= (RGB_RED_PIN | RGB_BLUE_PIN);  // Red + Blue = Purple
-            break;
-        case NONE:
-        default:
-            // All LEDs are off
-            break;
-    }
-}
-
 // Debounce function to avoid switch bouncing issues
 void debounce(void)
 {
@@ -282,21 +245,10 @@ SwitchState CheckSwitchReset(void)
     return NotPressed;
 }
 
-// Initialize RGB LEDs
-void InitializeRGBLEDs(void)
-{
-    // Set RGB pins as output
-    RGB_PORT->DIR |= RGB_ALL_PINS;
-
-    // Turn off all LEDs initially
-    RGB_PORT->OUT &= ~RGB_ALL_PINS;
-}
-
 void InitializePlaybackLED(void) {
     PLAYBACK_LED_PORT->DIR |= PLAYBACK_LED_PIN;  // Set P2.3 as output
     PLAYBACK_LED_PORT->OUT &= ~PLAYBACK_LED_PIN; // Ensure LED is OFF initially
 }
-
 
 // Initialize switches
 void InitializeSwitches(void)
