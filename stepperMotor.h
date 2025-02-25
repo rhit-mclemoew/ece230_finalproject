@@ -34,7 +34,6 @@ extern "C"
 #define STEPPER_IN3                     (0x0020)
 #define STEPPER_IN4                     (0x0010)
 
-// TODO set initial step timer period for 10 RPM (based on 4MHz clock rate)
 #define INIT_PERIOD                     2500
 #define STEP_SEQ_CNT                    4
 

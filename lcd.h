@@ -1,4 +1,4 @@
-//File Name: lcd_template.h
+//File Name: lcd.h
 //ECE230 Winter 2024-2025
 //Date: January 17, 2025
 /*!
@@ -51,7 +51,6 @@ extern "C"
 #define CLEAR_DISPLAY_MASK  0x01
 #define RETURN_HOME_MASK    0x02
 #define ENTRY_MODE_MASK     0x04
-// TODO complete values for instruction masks
 #define DISPLAY_CTRL_MASK   0x08
 #define CURSOR_SHIFT_MASK   0x10
 #define FUNCTION_SET_MASK   0x20
@@ -78,7 +77,6 @@ extern "C"
 #define DL_FLAG_MASK        0x10
 #define N_FLAG_MASK         0x08
 #define SC_FLAG_MASK        0x08
-// TODO complete values for instruction field masks
 #define F_FLAG_MASK         0x04
 #define RL_FLAG_MASK        0x04
 #define D_FLAG_MASK         0x04
