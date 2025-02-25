@@ -6,8 +6,8 @@
  *
  *      Description: Helper file for LCD library. For Hitachi HD44780 parallel LCD
  *               in 8-bit mode. Assumes the following connections:
- *               P2.7 <-----> RS
- *               P2.6 <-----> E
+ *               P6.7 <-----> RS
+ *               P6.6 <-----> E
  *                            R/W --->GND
  *                P4  <-----> DB
  *
@@ -18,16 +18,147 @@
 
 #include <msp.h>
 #include <string.h>
-
 #include "lcd.h"
 #include "sysTickDelays.h"
+#include "stdio.h"
+#include "timer32.h"
 
 #define NONHOME_MASK        0xF
-
 #define LCD_WIDTH 16
-
 #define LONG_INSTR_DELAY    2000
 #define SHORT_INSTR_DELAY   50
+
+
+
+typedef struct {
+    int offset;         // Current scroll position
+    unsigned int isScrolling;  // Whether this line needs to scroll
+} LineState;
+
+static struct {
+    LineState title;
+    LineState artist;
+    uint32_t lastUpdateTime;
+} displayState = {{0, 0}, {0, 0}, 0};
+
+
+void lcdDisplayTitleArtist(const char *songInfo) {
+    static char lastTitle[32] = "";
+    static char lastArtist[32] = "";
+
+    char formattedTitle[32];  // Store "1. Song Title"
+    char title[32] = {0};
+    char artist[32] = {0};
+    char displayBuffer[LCD_WIDTH + 1];
+    uint32_t currentTime;
+    int splitIndex;
+    int titleLen;
+    int artistLen;
+    int i;
+    const char *artistStart;
+
+    // Find the separator (hyphen)
+    splitIndex = -1;
+    for (i = 0; songInfo[i] != '\0'; i++) {
+        if (songInfo[i] == '-') {
+            splitIndex = i;
+            break;
+        }
+    }
+
+    // Extract title and artist
+    if (splitIndex == -1) {
+        strncpy(title, songInfo, sizeof(title) - 1);
+        artist[0] = '\0';
+    } else {
+        strncpy(title, songInfo, splitIndex);
+        title[splitIndex] = '\0';
+
+        artistStart = songInfo + splitIndex + 1;
+        while (*artistStart == ' ') artistStart++; // Skip leading spaces
+        strncpy(artist, artistStart, sizeof(artist) - 1);
+    }
+
+    // Format title with song number
+    snprintf(formattedTitle, sizeof(formattedTitle), "%d. %s", currentSong + 1, title);
+
+    // Only update display if content changed
+    if (strcmp(formattedTitle, lastTitle) != 0 || strcmp(artist, lastArtist) != 0) {
+        lcdClearDisplay();  // Only clear if necessary
+        strncpy(lastTitle, formattedTitle, sizeof(lastTitle));
+        strncpy(lastArtist, artist, sizeof(lastArtist));
+    }
+
+    // Get lengths and determine if scrolling is needed
+    titleLen = strlen(formattedTitle);
+    artistLen = strlen(artist);
+
+    displayState.title.isScrolling = (titleLen > LCD_WIDTH) ? 1 : 0;
+    displayState.artist.isScrolling = (artistLen > LCD_WIDTH) ? 1 : 0;
+
+    // Get current system time
+    currentTime = getSystemTime();
+
+    // Update scroll positions if enough time has passed
+    if ((currentTime - displayState.lastUpdateTime) >= SCROLL_DELAY_MS) {
+        displayState.lastUpdateTime = currentTime;
+
+        if (displayState.title.isScrolling) {
+            displayState.title.offset = (displayState.title.offset + 1) % (titleLen + SCROLL_PADDING);
+        }
+
+        if (displayState.artist.isScrolling) {
+            displayState.artist.offset = (displayState.artist.offset + 1) % (artistLen + SCROLL_PADDING);
+        }
+    }
+
+    // Display formatted title (top row)
+    lcdSetCursor(0, 0);
+    if (displayState.title.isScrolling) {
+        scrollText(displayBuffer, formattedTitle, titleLen, displayState.title.offset);
+    } else {
+        centerText(displayBuffer, formattedTitle, titleLen);
+    }
+    lcdPrintString(displayBuffer);
+
+    // Display artist (bottom row)
+    lcdSetCursor(1, 0);
+    if (displayState.artist.isScrolling) {
+        scrollText(displayBuffer, artist, artistLen, displayState.artist.offset);
+    } else {
+        centerText(displayBuffer, artist, artistLen);
+    }
+    lcdPrintString(displayBuffer);
+}
+
+
+
+static void scrollText(char *dest, const char *src, int srcLen, int offset) {
+    int i;
+    int totalLen = srcLen + SCROLL_PADDING;  // Add padding between wrap
+
+    for (i = 0; i < LCD_WIDTH; i++) {
+        int pos = (offset + i) % totalLen;
+        dest[i] = pos < srcLen ? src[pos] : ' ';
+    }
+    dest[LCD_WIDTH] = '\0';
+}
+
+static void centerText(char *dest, const char *src, int srcLen) {
+    int padding = (LCD_WIDTH - srcLen) / 2;
+    int i;
+
+    // Fill with spaces first
+    for (i = 0; i < LCD_WIDTH; i++) {
+        dest[i] = ' ';
+    }
+    dest[LCD_WIDTH] = '\0';
+
+    // Copy text in center position
+    for (i = 0; i < srcLen && i < LCD_WIDTH; i++) {
+        dest[padding + i] = src[i];
+    }
+}
 
 void configLCD(uint32_t clkFreq) {
     // configure pins as GPIO
@@ -143,6 +274,8 @@ void initLCD(void) {
 
     // after initialization and configuration, turn display ON
     commandInstruction(DISPLAY_CTRL_MASK | D_FLAG_MASK);
+    lcdClearDisplay();
+    lcdSetCursor(0, 0);
 }
 
 void printChar(char character) {
@@ -152,24 +285,22 @@ void printChar(char character) {
 
 void lcdPrintString(const char *string) {
     int pos = 0;  // Track cursor position
+    int row = 0;  // Track current row
 
     while (*string) {
         if (pos == LCD_WIDTH) {  // If we reach the end of the first line
-            lcdSetCursor(1, 0);   // Move to second line
+            row++;  // Move to next row
+            if (row > 1) break;  // Stop after second row is full
+
+            lcdSetCursor(1, 0);  // Move to line 2
             pos = 0;  // Reset position for second line
         }
 
         dataInstruction(*string);  // Print the character
         string++;
         pos++;
-
-        if (pos == LCD_WIDTH * 2) {  // Stop after both lines are full
-            break;
-        }
     }
 }
-
-
 
 void lcdSetCursor(uint8_t row, uint8_t col) {
     uint8_t address;

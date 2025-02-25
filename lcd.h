@@ -33,6 +33,9 @@ extern "C"
 #include <msp.h>
 #include <string.h>
 
+#define SCROLL_PADDING 4
+#define SCROLL_DELAY_MS 2000
+
 #define LCD_DB_PORT         P4
 #define LCD_RS_PORT         P6
 #define LCD_EN_PORT         P6
@@ -127,6 +130,12 @@ extern void lcdPrintString(const char *string);
 extern void lcdSetCursor(uint8_t row, uint8_t col);
 
 extern void lcdClearDisplay(void);
+
+void lcdDisplayTitleArtist(const char *songInfo);
+
+static void centerText(char *dest, const char *src, int srcLen);
+
+static void scrollText(char *dest, const char *src, int srcLen, int offset);
 
 
 //*****************************************************************************

@@ -1,5 +1,4 @@
 #include "msp.h"
-
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -8,6 +7,7 @@
 #include "stepperMotor.h"
 #include "lcd.h"
 #include "uart.h"
+#include "timer32.h"
 
 // RGB port and bit masks
 #define RGB_PORT        P2              // Port 2
@@ -15,6 +15,9 @@
 #define RGB_GREEN_PIN   0b00000010      // P2.1
 #define RGB_BLUE_PIN    0b00000100      // P2.2
 #define RGB_ALL_PINS    (RGB_RED_PIN | RGB_GREEN_PIN | RGB_BLUE_PIN)
+#define PLAYBACK_LED_PORT    P2    // Using Port 2
+#define PLAYBACK_LED_PIN     BIT3  // LED connected to P2.3
+
 
 // Switch port and masks
 #define SwitchPort      P3              // Port 3
@@ -40,15 +43,40 @@ typedef enum _SwitchState {
     NotPressed, Pressed
 } SwitchState;
 
-typedef enum MenuState {
-    START_SCREEN, SELECT_SCREEN, PLAYING_SCREEN
-} ScreenState;
-
 ScreenState currentState = START_SCREEN;
-int currentSong = 0;
-int isPlaying = 0;
+uint8_t currentSong = 0;
+uint8_t isPlaying = 0;
+uint8_t isReset = 0;
 
-const char *songList[] = {"Happy", "Sad", "Excited", "Chill"};
+const char *songList[] = {
+    "Again-Fetty Wap",
+    "Friends in Low Places-Garth Brooks",
+    "Happy-Pharrell",
+    "Suspicious Minds-Elvis Presley",
+    "One More Time-Daft Punk",
+    "Stronger-Kanye West",
+    "Billie Jean-Michael Jackson",
+    "Tennessee Whiskey-Chris Stapleton",
+    "Chop Suey-System of a Down",
+    "One Last Breath-Creed",
+    "A Thousand Miles-Vanessa Carlton",
+    "Blue Jean Baby-Zach Bryan",
+    "Somebody That I Used To Know-Gotye",
+    "Yellow-Coldplay",
+    "Hey There Delilah-Plain White T's",
+    "Grenade-Bruno Mars",
+    "Starboy-The Weeknd",
+    "Like a Rolling Stone-Bob Dylan",
+    "Payphone-Maroon 5",
+    "Boulevard of Broken Dreams-Green Day",
+    "Circles-Post Malone",
+    "Stressed Out-Twenty One Pilots",
+    "Bitter Sweet Symphony-The Verve",
+    "Runaway-Kanye West",
+    "Ghost Riders in the Sky-Johnny Cash",
+    "My Way-Frank Sinatra",
+};
+
 #define SONG_COUNT (sizeof(songList) / sizeof(songList[0]))
 
 // Function prototypes
@@ -62,19 +90,21 @@ void debounce(void);
 void SetLED(LEDcolors color);
 void handleButtonPress(void);
 extern void play_serial_audio_stereo(void);
+void InitializePlaybackLED(void);
+
+volatile uint8_t updateLCD = 0;
 
 // Global variables
 LEDcolors CurrentLED = NONE;
-
-volatile uint8_t receivedByte = 0;
-volatile bool dataReady = false;  // Flag to indicate data reception
 
 int main(void)
 {
     WDT_A->CTL = WDT_A_CTL_PW | WDT_A_CTL_HOLD;  // Stop watchdog timer
 
     configHFXT();
+    Timer32_Init();
     InitializeRGBLEDs();
+    InitializePlaybackLED();
     InitializeSwitches();
     initStepperMotor();
     enableStepperMotor();
@@ -82,10 +112,13 @@ int main(void)
     initLCD();
     initUART();
 
-
     while (1) {
         handleButtonPress();
-
+        if (updateLCD) {
+            updateLCD = 0;  // Reset flag
+            lcdDisplayTitleArtist(songList[currentSong]);
+        }
+        __no_operation();
     }
 
 }
@@ -97,6 +130,10 @@ void handleButtonPress() {
         currentState = START_SCREEN;
         currentSong = 0;
         isPlaying = 0;
+        isReset = 1;
+        sendPlaybackStatus(isPlaying, currentSong, isReset);
+        isReset = 0;
+        PLAYBACK_LED_PORT->OUT &= ~PLAYBACK_LED_PIN;
         while (CheckSwitchReset() == Pressed) {}
         return;
     }
@@ -111,22 +148,14 @@ void handleButtonPress() {
             lcdSetCursor(1, 0);
             lcdPrintString("  Press \"Next\"");
             break;
-        case SELECT_SCREEN: {
-            char buffer[20];
-            snprintf(buffer, sizeof(buffer), "%d. %s", currentSong + 1, songList[currentSong]);
+        case SELECT_SCREEN:
             lcdClearDisplay();
-            lcdSetCursor(0, 0);
-            lcdPrintString(buffer);
+            lcdDisplayTitleArtist(songList[currentSong]);  // Show song title and artist
             break;
-        }
-        case PLAYING_SCREEN: {
-            char buffer[20];
+        case PLAYING_SCREEN:
             lcdClearDisplay();
-            lcdSetCursor(0, 0);
-            snprintf(buffer, sizeof(buffer), "%s %s", isPlaying ? " >" : "||", songList[currentSong]);
-            lcdPrintString(buffer);
+            lcdDisplayTitleArtist(songList[currentSong]);  // Show song title and artist
             break;
-        }
         }
     }
 
@@ -140,22 +169,39 @@ void handleButtonPress() {
     case SELECT_SCREEN:
         if (CheckSwitchSelect() == Pressed) {
             currentState = PLAYING_SCREEN;
+            isPlaying = !isPlaying;
+            sendPlaybackStatus(isPlaying, currentSong, isReset);
+            if (isPlaying) {
+                PLAYBACK_LED_PORT->OUT |= PLAYBACK_LED_PIN;  // LED ON when playing
+            } else {
+                PLAYBACK_LED_PORT->OUT &= ~PLAYBACK_LED_PIN; // LED OFF when paused
+            }
+            lastState = (ScreenState)(-1);
             while (CheckSwitchSelect() == Pressed) {}
         } else if (CheckSwitchNext() == Pressed) {
-            currentSong = (currentSong + 1) % SONG_COUNT;
-            lastState = (ScreenState)(-1);
+            currentSong = (currentSong + 1) % SONG_COUNT;  // Increase song index and wrap
+            lcdClearDisplay();
+            lcdDisplayTitleArtist(songList[currentSong]);  // Update display immediately
+            lastState = (ScreenState)(-1);  // Force a UI update
             while (CheckSwitchNext() == Pressed) {}
         }
         break;
     case PLAYING_SCREEN:
         if (CheckSwitchToggle() == Pressed) {
             isPlaying = !isPlaying;
+            sendPlaybackStatus(isPlaying, currentSong, isReset);
+            if (isPlaying) {
+                PLAYBACK_LED_PORT->OUT |= PLAYBACK_LED_PIN;  // LED ON when playing
+            } else {
+                PLAYBACK_LED_PORT->OUT &= ~PLAYBACK_LED_PIN; // LED OFF when paused
+            }
             lastState = (ScreenState)(-1);
             while (CheckSwitchToggle() == Pressed) {}
         }
         break;
     }
 }
+
 
 
 // Set the LED color
@@ -189,8 +235,12 @@ void SetLED(LEDcolors color)
 void debounce(void)
 {
     int delay;
-    for (delay = 0; delay < 5000; delay++);
+    for (delay = 0; delay < 2500; delay++); // Initial delay
+    while (!(SwitchPort->IN & (SwitchNext | SwitchSelect | SwitchToggle | SwitchReset))) {
+        for (delay = 0; delay < 2500; delay++);  // Additional delay
+    }
 }
+
 
 // Check if Switch 1 is pressed
 SwitchState CheckSwitchNext(void)
@@ -241,6 +291,12 @@ void InitializeRGBLEDs(void)
     // Turn off all LEDs initially
     RGB_PORT->OUT &= ~RGB_ALL_PINS;
 }
+
+void InitializePlaybackLED(void) {
+    PLAYBACK_LED_PORT->DIR |= PLAYBACK_LED_PIN;  // Set P2.3 as output
+    PLAYBACK_LED_PORT->OUT &= ~PLAYBACK_LED_PIN; // Ensure LED is OFF initially
+}
+
 
 // Initialize switches
 void InitializeSwitches(void)

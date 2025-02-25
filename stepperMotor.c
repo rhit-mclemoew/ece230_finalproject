@@ -17,7 +17,7 @@
 /* Global Variables  */
 // TODO fill in array with 4-bit binary sequence for wave drive (1-phase full step)
 const uint8_t stepperSequence[STEP_SEQ_CNT] =  { 0b1000, 0b0100, 0b0010, 0b0001 };
-uint16_t stepPeriod = 11719;
+uint16_t stepPeriod = 2500;
 uint8_t currentStep = 0;
 
 

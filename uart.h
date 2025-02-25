@@ -27,4 +27,9 @@ uint8_t readByte(void);
  */
 void uartEcho(void);
 
+void sendPlaybackStatus(uint8_t isPlaying, uint8_t songIndex, uint8_t isReset);
+
+void sendString(const char *str);
+
+
 #endif /* UART_H_ */
