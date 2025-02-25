@@ -8,11 +8,11 @@ extern uint8_t currentSong;
 extern const char *songList[];
 extern uint8_t currentSong;
 
-typedef enum MenuState {
+typedef enum MenuState { // Menu states
     START_SCREEN, SELECT_SCREEN, PLAYING_SCREEN
 } ScreenState;
 
-extern ScreenState currentState;
+extern ScreenState currentState; // current state
 
 
 void Timer32_Init(void);

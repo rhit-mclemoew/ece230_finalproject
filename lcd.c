@@ -207,10 +207,10 @@ void instructionDelay(uint8_t mode, uint8_t instruction) {
  * \return None
  */
 void writeInstruction(uint8_t mode, uint8_t instruction) {
-    // TODO set 8-bit data on LCD DB port
+    // DONE set 8-bit data on LCD DB port
     LCD_DB_PORT->OUT = instruction;
 
-    // TODO set RS for data or control instruction mode
+    // DONE set RS for data or control instruction mode
     //      use bit-masking to avoid affecting other pins of port
     if (mode == DATA_MODE) {
         LCD_RS_PORT->OUT |= LCD_RS_MASK; // Set RS high for data mode
@@ -218,12 +218,12 @@ void writeInstruction(uint8_t mode, uint8_t instruction) {
         LCD_RS_PORT->OUT &= ~LCD_RS_MASK; // Set RS low for control mode
     }
     // pulse E to execute instruction on LCD
-    // TODO set Enable signal high
+    // DONE set Enable signal high
     //      use bit-masking to avoid affecting other pins of port
 
     LCD_EN_PORT->OUT |= LCD_EN_MASK;  // Set Enable signal high
     delayMicroSec(1);
-    // TODO set Enable signal low
+    // DONE set Enable signal low
     //      use bit-masking to avoid affecting other pins of port
     LCD_EN_PORT->OUT &= ~LCD_EN_MASK; // Set Enable signal low
     // delay to allow instruction execution to complete
@@ -283,26 +283,26 @@ void printChar(char character) {
     dataInstruction(character);
 }
 
-void lcdPrintString(const char *string) {
-    int pos = 0;  // Track cursor position
-    int row = 0;  // Track current row
+void lcdPrintString(const char *string) { // Prints string to lcd
+    int pos = 0;
+    int row = 0;
 
     while (*string) {
-        if (pos == LCD_WIDTH) {  // If we reach the end of the first line
-            row++;  // Move to next row
-            if (row > 1) break;  // Stop after second row is full
+        if (pos == LCD_WIDTH) {
+            row++;
+            if (row > 1) break;
 
-            lcdSetCursor(1, 0);  // Move to line 2
-            pos = 0;  // Reset position for second line
+            lcdSetCursor(1, 0);
+            pos = 0;
         }
 
-        dataInstruction(*string);  // Print the character
+        dataInstruction(*string);
         string++;
         pos++;
     }
 }
 
-void lcdSetCursor(uint8_t row, uint8_t col) {
+void lcdSetCursor(uint8_t row, uint8_t col) { // Sets cursor at select row and col
     uint8_t address;
     if (row == 0) {
         address = 0x80 + col;  // Line 1 starts at 0x80

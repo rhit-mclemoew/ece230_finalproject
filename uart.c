@@ -34,9 +34,9 @@ void sendString(const char *str) {
 }
 
 
-void sendPlaybackStatus(uint8_t isPlaying, uint8_t songIndex, uint8_t isReset) {
+void sendPlaybackStatus(uint8_t isPlaying, uint8_t songIndex, uint8_t isReset) { // Sends UART command to ESP32
     char buffer[25];
-    sprintf(buffer, "P:%u S:%u R:%u\n", isPlaying, songIndex, isReset);  // Using %u for unsigned integers
+    sprintf(buffer, "P:%u S:%u R:%u\n", isPlaying, songIndex, isReset);
     sendString(buffer);
 }
 

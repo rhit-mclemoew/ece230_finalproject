@@ -33,15 +33,18 @@ typedef enum _LEDcolors {
     RED, GREEN, BLUE, PURPLE, NONE
 } LEDcolors;
 
+// Pressed States
 typedef enum _SwitchState {
     NotPressed, Pressed
 } SwitchState;
 
+//Initial variables
 ScreenState currentState = START_SCREEN;
 uint8_t currentSong = 0;
 uint8_t isPlaying = 0;
 uint8_t isReset = 0;
 
+//song list
 const char *songList[] = {
     "Again-Fetty Wap",
     "Friends in Low Places-Garth Brooks",
@@ -72,6 +75,7 @@ const char *songList[] = {
     "We Are The Champions-Queen"
 };
 
+//song count
 #define SONG_COUNT (sizeof(songList) / sizeof(songList[0]))
 
 // Function prototypes
@@ -90,10 +94,12 @@ volatile uint8_t updateLCD = 0;
 // Global variables
 LEDcolors CurrentLED = NONE;
 
+//main function
 int main(void)
 {
     WDT_A->CTL = WDT_A_CTL_PW | WDT_A_CTL_HOLD;  // Stop watchdog timer
 
+    //initializing everything
     configHFXT();
     Timer32_Init();
     InitializePlaybackLED();
@@ -104,28 +110,30 @@ int main(void)
     initLCD();
     initUART();
 
+    //while loop
     while (1) {
         handleButtonPress();
         if (updateLCD) {
             updateLCD = 0;  // Reset flag
-            lcdDisplayTitleArtist(songList[currentSong]);
+            lcdDisplayTitleArtist(songList[currentSong]); //calls the updating scrolling lcd text function
         }
         __no_operation();
     }
 
 }
 
+//main state machine, handles button presses and other important features
 void handleButtonPress() {
     static ScreenState lastState = (ScreenState)(-1);
 
-    if (CheckSwitchReset() == Pressed) {
+    if (CheckSwitchReset() == Pressed) { //reset button
         currentState = START_SCREEN;
         currentSong = 0;
         isPlaying = 0;
         isReset = 1;
-        sendPlaybackStatus(isPlaying, currentSong, isReset);
+        sendPlaybackStatus(isPlaying, currentSong, isReset); // sends uart command
         isReset = 0;
-        PLAYBACK_LED_PORT->OUT &= ~PLAYBACK_LED_PIN;
+        PLAYBACK_LED_PORT->OUT &= ~PLAYBACK_LED_PIN; //toggles led off
         while (CheckSwitchReset() == Pressed) {}
         return;
     }
@@ -133,18 +141,18 @@ void handleButtonPress() {
     if (currentState != lastState) {
         lastState = currentState;
         switch (currentState) {
-        case START_SCREEN:
+        case START_SCREEN: //starting state, puts welcome message
             lcdClearDisplay();
             lcdSetCursor(0, 0);
             lcdPrintString(" Karaoke Machine");
             lcdSetCursor(1, 0);
             lcdPrintString("  Press \"Next\"");
             break;
-        case SELECT_SCREEN:
+        case SELECT_SCREEN: // selection state, displays current song and artist
             lcdClearDisplay();
             lcdDisplayTitleArtist(songList[currentSong]);  // Show song title and artist
             break;
-        case PLAYING_SCREEN:
+        case PLAYING_SCREEN:// playing state, displays current song and artist
             lcdClearDisplay();
             lcdDisplayTitleArtist(songList[currentSong]);  // Show song title and artist
             break;
@@ -152,17 +160,17 @@ void handleButtonPress() {
     }
 
     switch (currentState) {
-    case START_SCREEN:
+    case START_SCREEN: // changes to select if select or next is pressed
         if (CheckSwitchSelect() == Pressed || CheckSwitchNext() == Pressed) {
             currentState = SELECT_SCREEN;
             while (CheckSwitchSelect() == Pressed || CheckSwitchNext() == Pressed) {}
         }
         break;
-    case SELECT_SCREEN:
+    case SELECT_SCREEN: // changes to playing if select is pressed
         if (CheckSwitchSelect() == Pressed) {
             currentState = PLAYING_SCREEN;
-            isPlaying = !isPlaying;
-            sendPlaybackStatus(isPlaying, currentSong, isReset);
+            isPlaying = !isPlaying; // toggles playing
+            sendPlaybackStatus(isPlaying, currentSong, isReset); // sends uart command
             if (isPlaying) {
                 PLAYBACK_LED_PORT->OUT |= PLAYBACK_LED_PIN;  // LED ON when playing
             } else {
@@ -178,10 +186,10 @@ void handleButtonPress() {
             while (CheckSwitchNext() == Pressed) {}
         }
         break;
-    case PLAYING_SCREEN:
+    case PLAYING_SCREEN: // Handles playback button presses
         if (CheckSwitchToggle() == Pressed) {
-            isPlaying = !isPlaying;
-            sendPlaybackStatus(isPlaying, currentSong, isReset);
+            isPlaying = !isPlaying; // toggles playing variable
+            sendPlaybackStatus(isPlaying, currentSong, isReset); // sends uart command
             if (isPlaying) {
                 PLAYBACK_LED_PORT->OUT |= PLAYBACK_LED_PIN;  // LED ON when playing
             } else {
@@ -245,9 +253,9 @@ SwitchState CheckSwitchReset(void)
     return NotPressed;
 }
 
-void InitializePlaybackLED(void) {
+void InitializePlaybackLED(void) { // Initializes Playback LED
     PLAYBACK_LED_PORT->DIR |= PLAYBACK_LED_PIN;  // Set P2.3 as output
-    PLAYBACK_LED_PORT->OUT &= ~PLAYBACK_LED_PIN; // Ensure LED is OFF initially
+    PLAYBACK_LED_PORT->OUT &= ~PLAYBACK_LED_PIN;
 }
 
 // Initialize switches
